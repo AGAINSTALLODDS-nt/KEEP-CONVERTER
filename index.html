@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Google Keep → Apple Notes Converter</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    
+    #progressBar {
+      width: 100%; background-color: #f3f3f3; border-radius: 5px;
+      margin-top: 10px; height: 20px;
+    }
+    #bar {
+      height: 100%; width: 0%; background-color: #4caf50;
+      text-align: center; line-height: 20px; color: white;
+      border-radius: 5px; font-size: 14px; transition: width 0.3s;
+    }
+    
+    .label-column {
+      display: inline-block; vertical-align: top; width: 220px;
+      margin-right: 20px; border: 1px solid #ccc; padding: 10px;
+      border-radius: 5px; margin-bottom: 20px; background: #fff;
+    }
+    .note {
+      margin-bottom: 8px; border: 1px solid #eee; padding: 6px;
+      border-radius: 3px; font-size: 14px; word-break: break-word;
+    }
+    .note label { cursor: pointer; margin-left: 5px; }
+    
+    #log {
+      margin-top: 30px; padding: 10px; background: #f9f9f9;
+      border: 1px solid #ddd; white-space: pre-wrap; font-family: monospace;
+      max-height: 300px; overflow-y: auto; font-size: 12px;
+    }
+    
+    /* Отступы для кнопок */
+    #btnSelectAll, #exportButton { margin-left: 15px; }
+    
+    /* Селектор языка справа сверху */
+    #languageSelector {
+      float: right; margin-top: -50px; margin-right: 0;
+      padding: 5px; border-radius: 4px; border: 1px solid #ccc;
+    }
+  </style>
+</head>
+<body>
+
+<h1 id="pageTitle">Google Keep → Apple Notes Converter</h1>
+
+<!-- Переключатель языка -->
+<select id="languageSelector" onchange="changeLanguage(this.value)">
+  <option value="en">English</option>
+  <option value="ru">Русский</option>
+</select>
+
+<div style="margin-top: 60px;">
+  <input type="file" id="zipInput" accept=".zip" onchange="startProcessing()">
+  <button id="btnSelectAll" onclick="selectAllNotes()">Select All</button>
+  <button id="exportButton" onclick="exportSelectedNotes()">Export Selected Notes</button>
+</div>
+
+<div id="progressBar"><div id="bar">0%</div></div>
+
+<div id="notesContainer" style="margin-top: 20px;"></div>
+
+<div id="log"></div>
+
+<script src="https://unpkg.com/fflate/umd/index.js"></script>
+<script src="script.js"></script>
+
+</body>
+</html>
+
