@@ -28,7 +28,7 @@ function applyTranslations() {
 }
 loadLanguage(currentLang);
 
-// === МОДАЛЬНОЕ ОКНО ===
+// === МОДАЛЬНОЕ ОКНО ПРОСМОТРА ===
 function openNoteModal(note) {
   const modal = document.getElementById('noteModal');
   const titleEl = document.getElementById('modalTitle');
@@ -37,7 +37,10 @@ function openNoteModal(note) {
   let displayTitle = note.title;
   if (!displayTitle && note.createdTimestampUsec) {
     const date = new Date(parseInt(note.createdTimestampUsec) / 1000000);
-    displayTitle = date.toLocaleString(currentLang, { year:'numeric', month:'long', day:'numeric', hour:'2-digit', minute:'2-digit' });
+    displayTitle = date.toLocaleString(currentLang, { 
+      year:'numeric', month:'long', day:'numeric', 
+      hour:'2-digit', minute:'2-digit' 
+    });
   }
   titleEl.textContent = displayTitle || 'Untitled Note';
   
@@ -66,7 +69,7 @@ function closeModal() {
   document.getElementById('noteModal').style.display = 'none';
 }
 
-// === ОСНОВНАЯ ЛОГИКА ===
+// === ОСНОВНАЯ ЛОГИКА ЗАГРУЗКИ И РЕНДЕРИНГА ===
 async function startProcessing() {
   const fileInput = document.getElementById('zipInput');
   if (!fileInput.files.length) return alert(lang.uploadFile || 'Please select a file');
@@ -93,7 +96,7 @@ async function startProcessing() {
       try {
         const content = new TextDecoder().decode(zip[filename]);
         const note = JSON.parse(content);
-        note.index = allNotes.length; 
+        note.index = allNotes.length; // Критически важно для экспорта
         allNotes.push(note);
       } catch (e) { log(`⚠️ Parse error: ${filename}`); }
       
@@ -119,7 +122,10 @@ function groupAndRenderNotes() {
     let title = note.title;
     if (!title && note.createdTimestampUsec) {
       const date = new Date(parseInt(note.createdTimestampUsec) / 1000000);
-      title = date.toLocaleString(currentLang, { year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+      title = date.toLocaleString(currentLang, { 
+        year:'numeric', month:'short', day:'numeric', 
+        hour:'2-digit', minute:'2-digit' 
+      });
     }
     if (!title) title = 'Untitled Note';
 
@@ -186,6 +192,7 @@ function groupAndRenderNotes() {
       const lbl = document.createElement('label');
       lbl.htmlFor = `chk-${note.index}`;
       lbl.textContent = note.displayTitle;
+      // Открытие модального окна при клике на название
       lbl.onclick = (e) => {
         e.preventDefault(); 
         openNoteModal(note);
@@ -209,13 +216,14 @@ function selectAllNotes() {
   checkboxes.forEach(c => c.checked = !allChecked);
 }
 
+// === ЭКСПОРТ С ПОДДЕРЖКОЙ ПАПOK И ЧЕКБОКСОВ ===
 function exportSelectedNotes() {
   const checked = document.querySelectorAll('#notesContainer input[type="checkbox"]:checked');
   if (!checked.length) return alert(lang.noNotesSelected);
 
   log(lang.exporting);
   
-  // ИСПРАВЛЕНО: Убран лишний пробел в версии XML
+  // Исправленный заголовок XML (без лишних пробелов)
   let xml = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE en-export SYSTEM "http://xml.evernote.com/pub/evernote-export.dtd">
 <en-export export-date="${new Date().toISOString().split('T')[0]}" application="Evernote" version="10.20.4">`;
@@ -225,21 +233,29 @@ function exportSelectedNotes() {
     const note = allNotes[idx];
     if (!note) return;
 
+    // Определение папки из первой метки
+    let notebookName = 'Imported Notes';
+    if (note.labels && note.labels.length > 0 && note.labels[0].name) {
+      notebookName = note.labels[0].name.replace(/[<>:"\/\\|?*]/g, '_').trim();
+    }
+
     let content = '';
     
+    // Обработка списков с чекбоксами
     if (Array.isArray(note.listContent)) {
       content = '<ul>';
       note.listContent.forEach(item => {
         const isChecked = item.isChecked ? ' checked="true"' : '';
         let text = item.text || '';
         if (item.textHtml) {
+          // Очистка HTML для корректной работы en-todo
           text = item.textHtml.replace(/<[^>]*>/g, ''); 
         }
-        // ИСПРАВЛЕНО: Корректный тег en-todo
         content += `<li><en-todo${isChecked}/>${escapeXML(text)}</li>`;
       });
       content += '</ul>';
     } 
+    // Обычный текст или HTML
     else if (note.textContentHtml) {
       content = note.textContentHtml;
     } else if (note.textContent) {
@@ -250,7 +266,7 @@ function exportSelectedNotes() {
 
     const title = escapeXML(note.title || 'Untitled');
     
-    // ИСПРАВЛЕНО: Безопасная обработка даты (защита от 1970 года)
+    // Безопасная обработка даты
     let ts = Date.now();
     if (note.userEditedTimestampUsec && note.userEditedTimestampUsec > 0) {
       ts = parseInt(note.userEditedTimestampUsec) / 1000000;
@@ -259,6 +275,7 @@ function exportSelectedNotes() {
     }
     const dateStr = formatDate(ts);
 
+    // Формирование тега <note> с внутренним <notebook>
     xml += `
 <note>
   <title>${title}</title>
@@ -267,6 +284,7 @@ function exportSelectedNotes() {
 <en-note>${content}</en-note>]]></content>
   <created>${dateStr}</created>
   <updated>${dateStr}</updated>
+  <notebook>${escapeXML(notebookName)}</notebook>
 </note>`;
   });
 
@@ -292,7 +310,6 @@ function escapeXML(str) {
 }
 function formatDate(timestamp) {
   const d = new Date(timestamp);
-  // Проверка на валидную дату
   if (isNaN(d.getTime())) return new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 15) + 'Z';
   return d.toISOString().replace(/[-:T.]/g, '').slice(0, 15) + 'Z';
 }
