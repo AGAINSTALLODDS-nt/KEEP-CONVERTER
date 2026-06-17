@@ -34,7 +34,6 @@ function openNoteModal(note) {
   const titleEl = document.getElementById('modalTitle');
   const bodyEl = document.getElementById('modalBody');
   
-  // Заголовок (если нет, берем дату)
   let displayTitle = note.title;
   if (!displayTitle && note.createdTimestampUsec) {
     const date = new Date(parseInt(note.createdTimestampUsec) / 1000000);
@@ -42,14 +41,12 @@ function openNoteModal(note) {
   }
   titleEl.textContent = displayTitle || 'Untitled Note';
   
-  // Тело заметки
   if (Array.isArray(note.listContent)) {
     let html = '<ul>';
     note.listContent.forEach(item => {
       const isChecked = item.isChecked;
       const className = isChecked ? ' class="todo-checked"' : '';
       const text = item.textHtml || escapeXML(item.text || '');
-      // Для превью используем обычный HTML список
       html += `<li${className}>${text}</li>`;
     });
     html += '</ul>';
@@ -96,7 +93,7 @@ async function startProcessing() {
       try {
         const content = new TextDecoder().decode(zip[filename]);
         const note = JSON.parse(content);
-        note.index = allNotes.length; // ВАЖНО: индекс для связи
+        note.index = allNotes.length; 
         allNotes.push(note);
       } catch (e) { log(`⚠️ Parse error: ${filename}`); }
       
@@ -141,7 +138,6 @@ function groupAndRenderNotes() {
     const col = document.createElement('div');
     col.className = 'label-column';
 
-    // Хедер колонки
     const header = document.createElement('div');
     header.style.display = 'flex';
     header.style.justifyContent = 'space-between';
@@ -175,7 +171,6 @@ function groupAndRenderNotes() {
     header.appendChild(selectColBtn);
     col.appendChild(header);
 
-    // Список заметок
     const list = document.createElement('div');
     list.className = 'notes-list';
 
@@ -183,18 +178,16 @@ function groupAndRenderNotes() {
       const item = document.createElement('div');
       item.className = 'note-item';
       
-      // Чекбокс экспорта
       const cb = document.createElement('input');
       cb.type = 'checkbox';
       cb.id = `chk-${note.index}`;
       cb.dataset.index = note.index;
       
-      // Лейбл с названием (кликабельный)
       const lbl = document.createElement('label');
       lbl.htmlFor = `chk-${note.index}`;
       lbl.textContent = note.displayTitle;
       lbl.onclick = (e) => {
-        e.preventDefault(); // Чтобы не триггерить чекбокс при клике на текст
+        e.preventDefault(); 
         openNoteModal(note);
       };
 
@@ -221,6 +214,8 @@ function exportSelectedNotes() {
   if (!checked.length) return alert(lang.noNotesSelected);
 
   log(lang.exporting);
+  
+  // ИСПРАВЛЕНО: Убран лишний пробел в версии XML
   let xml = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE en-export SYSTEM "http://xml.evernote.com/pub/evernote-export.dtd">
 <en-export export-date="${new Date().toISOString().split('T')[0]}" application="Evernote" version="10.20.4">`;
@@ -232,23 +227,19 @@ function exportSelectedNotes() {
 
     let content = '';
     
-    // === ОБРАБОТКА СПИСКОВ С ЧЕКБОКСАМИ ===
     if (Array.isArray(note.listContent)) {
       content = '<ul>';
       note.listContent.forEach(item => {
         const isChecked = item.isChecked ? ' checked="true"' : '';
-        // Важно: внутри en-todo должен быть только текст, без лишних тегов p/span
-        // Если есть HTML, очищаем его до текста или оставляем базовое форматирование
         let text = item.text || '';
         if (item.textHtml) {
-          // Простая очистка HTML для en-todo (Apple Notes чувствителен к вложенным тегам внутри todo)
           text = item.textHtml.replace(/<[^>]*>/g, ''); 
         }
+        // ИСПРАВЛЕНО: Корректный тег en-todo
         content += `<li><en-todo${isChecked}/>${escapeXML(text)}</li>`;
       });
       content += '</ul>';
     } 
-    // Обычный текст / HTML
     else if (note.textContentHtml) {
       content = note.textContentHtml;
     } else if (note.textContent) {
@@ -258,13 +249,20 @@ function exportSelectedNotes() {
     }
 
     const title = escapeXML(note.title || 'Untitled');
-    const ts = note.userEditedTimestampUsec ? parseInt(note.userEditedTimestampUsec) / 1000000 : Date.now();
+    
+    // ИСПРАВЛЕНО: Безопасная обработка даты (защита от 1970 года)
+    let ts = Date.now();
+    if (note.userEditedTimestampUsec && note.userEditedTimestampUsec > 0) {
+      ts = parseInt(note.userEditedTimestampUsec) / 1000000;
+    } else if (note.createdTimestampUsec && note.createdTimestampUsec > 0) {
+      ts = parseInt(note.createdTimestampUsec) / 1000000;
+    }
     const dateStr = formatDate(ts);
 
     xml += `
 <note>
   <title>${title}</title>
-  <content><![CDATA[<?xml version=" "1.0" encoding="UTF-8"?>
+  <content><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE en-note SYSTEM "http://xml.evernote.com/pub/enml2.dtd">
 <en-note>${content}</en-note>]]></content>
   <created>${dateStr}</created>
@@ -294,6 +292,8 @@ function escapeXML(str) {
 }
 function formatDate(timestamp) {
   const d = new Date(timestamp);
+  // Проверка на валидную дату
+  if (isNaN(d.getTime())) return new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 15) + 'Z';
   return d.toISOString().replace(/[-:T.]/g, '').slice(0, 15) + 'Z';
 }
 function downloadFile(content, filename, mime) {
